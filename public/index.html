@@ -14,7 +14,7 @@
 <body>
     <h2>Sovereign Sync P2P</h2>
     <input type="file" id="fileInput" accept="video/mp4">
-    <video id="videoPlayer" controls></video>
+    <video id="videoPlayer" controls playsinline webkit-playsinline></video>
     
     <div class="controls">
         <input id="remoteId" placeholder="Arkadaşın ID'sini gir">
@@ -30,12 +30,10 @@
 
         peer.on('open', id => document.getElementById('myId').innerText = id);
 
-        // Dosya yükleme
         document.getElementById('fileInput').onchange = e => {
             video.src = URL.createObjectURL(e.target.files[0]);
         };
 
-        // Bağlantı yönetimi
         function connect() {
             conn = peer.connect(document.getElementById('remoteId').value);
             setupConn();
@@ -45,20 +43,29 @@
 
         function setupConn() {
             conn.on('open', () => document.getElementById('status').innerText = "BAĞLANDI!");
+            
+            // Sadece bir komut geldiğinde tepki ver
             conn.on('data', data => {
-                if (data.type === 'SYNC') {
-                    video.currentTime = data.time;
-                    if(data.playing) video.play(); else video.pause();
+                if (data.type === 'PLAY') { video.currentTime = data.time; video.play(); }
+                if (data.type === 'PAUSE') { video.pause(); video.currentTime = data.time; }
+                if (data.type === 'SEEK') { video.currentTime = data.time; }
+                if (data.type === 'HEARTBEAT') {
+                    if (Math.abs(video.currentTime - data.time) > 1.0) video.currentTime = data.time;
                 }
             });
         }
 
-        // Senkronizasyon (Heartbeat)
+        // Olay tabanlı gönderim (Daha az yük, daha az takılma)
+        video.onplay = () => conn && conn.send({ type: 'PLAY', time: video.currentTime });
+        video.onpause = () => conn && conn.send({ type: 'PAUSE', time: video.currentTime });
+        video.onseeked = () => conn && conn.send({ type: 'SEEK', time: video.currentTime });
+
+        // 3 saniyede bir çok hafif kontrol
         setInterval(() => {
             if (conn && conn.open) {
-                conn.send({ type: 'SYNC', time: video.currentTime, playing: !video.paused });
+                conn.send({ type: 'HEARTBEAT', time: video.currentTime });
             }
-        }, 500); // Yarım saniyede bir durumu karşıya bas
+        }, 3000);
     </script>
 </body>
 </html>
