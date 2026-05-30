@@ -48,12 +48,14 @@
             conn.on('data', data => {
                 isRemoteUpdate = true; // Komutun ağdan geldiğini işaretle
                 
-                if (data.type === 'PLAY') { video.currentTime = data.time; video.play(); }
-                if (data.type === 'PAUSE') { video.pause(); video.currentTime = data.time; }
+                if (data.type === 'PLAY') { video.play(); }
+                if (data.type === 'PAUSE') { video.pause(); }
                 if (data.type === 'SEEK') { video.currentTime = data.time; }
+                if (data.type === 'HEARTBEAT') { if (video.currentTime > data.time + 1.0) {video.currentTime = data.time; } }
+
                 
                 // İşlem bittikten kısa süre sonra bayrağı sıfırla
-                setTimeout(() => isRemoteUpdate = false, 500);
+                setTimeout(() => isRemoteUpdate = false, 100);
             });
         }
 
@@ -69,12 +71,12 @@
         video.onseeked = () => {
             if (!isRemoteUpdate && conn && conn.open) conn.send({ type: 'SEEK', time: video.currentTime });
         };
-        // 3 saniyede bir çok hafif kontrol
+        // 1 saniyede bir çok hafif kontrol
         setInterval(() => {
             if (conn && conn.open) {
                 conn.send({ type: 'HEARTBEAT', time: video.currentTime });
             }
-        }, 3000);
+        }, 1000);
     </script>
 </body>
 </html>
