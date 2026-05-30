@@ -1,82 +1,1493 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sovereign Sync</title>
-    <style>
-        body { background: #0b141a; color: white; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; padding: 20px; }
-        #videoPlayer { width: 100%; max-width: 800px; border-radius: 10px; background: black; }
-        .controls { margin-top: 15px; display: flex; gap: 10px; }
-        #status { color: #00a884; font-weight: bold; margin: 10px; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SovereignSync</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #080b0f;
+    --surface: #0e1419;
+    --surface2: #141c24;
+    --border: rgba(255,255,255,0.07);
+    --border2: rgba(255,255,255,0.13);
+    --accent: #c8f55a;
+    --accent2: #8ff0c0;
+    --text: #e8ecf0;
+    --muted: #5a6878;
+    --muted2: #8a98a8;
+    --danger: #ff5f5f;
+    --warn: #ffc36b;
+    --success: #4dffa0;
+    --mono: 'DM Mono', monospace;
+    --sans: 'Syne', sans-serif;
+  }
+
+  html, body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* NOISE TEXTURE OVERLAY */
+  body::before {
+    content: '';
+    position: fixed; inset: 0; z-index: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    background-size: 200px 200px;
+    pointer-events: none;
+  }
+
+  /* AMBIENT GLOW behind video */
+  #ambient-glow {
+    position: fixed; top: 0; left: 50%;
+    transform: translateX(-50%);
+    width: 900px; height: 500px;
+    border-radius: 50%;
+    background: radial-gradient(ellipse at center, rgba(200,245,90,0.04) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+    transition: background 3s ease;
+  }
+
+  .layout {
+    position: relative; z-index: 1;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 24px 20px 48px;
+    display: grid;
+    grid-template-rows: auto auto 1fr auto;
+    gap: 20px;
+    min-height: 100vh;
+  }
+
+  /* HEADER */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 4px;
+  }
+
+  .logo {
+    display: flex; align-items: center; gap: 10px;
+    font-size: 18px; font-weight: 700; letter-spacing: -0.5px;
+  }
+
+  .logo-icon {
+    width: 32px; height: 32px;
+    background: var(--accent);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    color: #080b0f;
+  }
+
+  .logo-icon svg { width: 18px; height: 18px; }
+
+  .connection-bar {
+    display: flex; align-items: center; gap: 12px;
+  }
+
+  .status-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--muted);
+    transition: background 0.4s;
+    box-shadow: 0 0 0 0 transparent;
+  }
+  .status-dot.connected {
+    background: var(--success);
+    box-shadow: 0 0 8px var(--success);
+    animation: pulse-dot 2s infinite;
+  }
+  .status-dot.connecting { background: var(--warn); animation: pulse-dot 1s infinite; }
+
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  .status-label {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted2);
+    letter-spacing: 0.05em;
+  }
+
+  /* ID CARD */
+  .id-section {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  .id-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .id-card-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+
+  .id-value {
+    font-family: var(--mono);
+    font-size: 15px;
+    color: var(--accent);
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    display: flex; align-items: center; gap: 8px;
+  }
+
+  .id-value:hover .copy-hint { opacity: 1; }
+  .copy-hint {
+    opacity: 0;
+    font-size: 10px;
+    color: var(--muted);
+    transition: opacity 0.2s;
+  }
+
+  .copy-flash {
+    animation: flash 0.3s ease;
+  }
+  @keyframes flash { 0%,100% { color: var(--accent); } 50% { color: var(--success); } }
+
+  .connect-form {
+    display: flex;
+    flex: 1;
+    gap: 8px;
+    align-items: flex-end;
+  }
+
+  .id-input-wrap { flex: 1; }
+
+  input[type="text"] {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  input[type="text"]:focus { border-color: var(--border2); }
+  input[type="text"]::placeholder { color: var(--muted); }
+
+  .btn {
+    padding: 10px 18px;
+    border-radius: 8px;
+    border: none;
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .btn:active { transform: scale(0.97); }
+
+  .btn-primary {
+    background: var(--accent);
+    color: #080b0f;
+  }
+  .btn-primary:hover { background: #d4fa6a; }
+  .btn-primary:disabled { background: var(--muted); color: var(--bg); cursor: not-allowed; }
+
+  .btn-ghost {
+    background: transparent;
+    border: 1px solid var(--border2);
+    color: var(--muted2);
+  }
+  .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* ROLE BADGE */
+  .role-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 4px 10px;
+    border-radius: 20px;
+    border: 1px solid;
+  }
+  .role-badge.host { border-color: rgba(200,245,90,0.4); color: var(--accent); background: rgba(200,245,90,0.07); }
+  .role-badge.guest { border-color: rgba(143,240,192,0.4); color: var(--accent2); background: rgba(143,240,192,0.07); }
+  .role-badge.none { border-color: var(--border); color: var(--muted); display: none; }
+
+  /* VIDEO AREA */
+  .video-section {
+    background: #000;
+    border-radius: 16px;
+    border: 1px solid var(--border);
+    overflow: hidden;
+    position: relative;
+    aspect-ratio: 16/9;
+  }
+
+  #videoEl {
+    width: 100%; height: 100%;
+    display: block;
+    object-fit: contain;
+    cursor: none;
+  }
+
+  /* DROP ZONE overlay */
+  .drop-zone {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 16px;
+    background: rgba(8,11,15,0.92);
+    transition: opacity 0.3s;
+    cursor: pointer;
+    z-index: 5;
+  }
+
+  .drop-zone.hidden { opacity: 0; pointer-events: none; }
+
+  .drop-icon {
+    width: 64px; height: 64px;
+    border: 2px dashed var(--border2);
+    border-radius: 16px;
+    display: flex; align-items: center; justify-content: center;
+    transition: border-color 0.2s;
+  }
+
+  .drop-zone:hover .drop-icon,
+  .drop-zone.drag-over .drop-icon { border-color: var(--accent); }
+
+  .drop-icon svg { color: var(--muted2); width: 28px; height: 28px; transition: color 0.2s; }
+  .drop-zone:hover .drop-icon svg,
+  .drop-zone.drag-over .drop-icon svg { color: var(--accent); }
+
+  .drop-text { font-size: 14px; color: var(--muted2); }
+  .drop-sub { font-size: 12px; color: var(--muted); font-family: var(--mono); }
+
+  #fileInputHidden { display: none; }
+
+  /* CUSTOM CONTROLS */
+  .video-controls {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    background: linear-gradient(transparent, rgba(8,11,15,0.95));
+    padding: 40px 20px 16px;
+    transform: translateY(0);
+    transition: opacity 0.3s, transform 0.3s;
+    z-index: 6;
+  }
+
+  .video-controls.hidden {
+    opacity: 0;
+    transform: translateY(8px);
+    pointer-events: none;
+  }
+
+  /* PROGRESS BAR */
+  .progress-wrap {
+    position: relative;
+    height: 20px;
+    display: flex; align-items: center;
+    cursor: pointer;
+    margin-bottom: 12px;
+  }
+
+  .progress-track {
+    width: 100%; height: 3px;
+    background: rgba(255,255,255,0.12);
+    border-radius: 2px;
+    position: relative;
+    overflow: hidden;
+    transition: height 0.15s;
+  }
+
+  .progress-wrap:hover .progress-track { height: 5px; }
+
+  .progress-buf {
+    position: absolute; left: 0; top: 0; bottom: 0;
+    background: rgba(255,255,255,0.2);
+    border-radius: 2px;
+    pointer-events: none;
+  }
+
+  .progress-fill {
+    position: absolute; left: 0; top: 0; bottom: 0;
+    background: var(--accent);
+    border-radius: 2px;
+    pointer-events: none;
+    transition: width 0.1s linear;
+  }
+
+  .progress-thumb {
+    position: absolute;
+    width: 14px; height: 14px;
+    background: var(--accent);
+    border-radius: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%) scale(0);
+    transition: transform 0.15s;
+    pointer-events: none;
+    z-index: 2;
+  }
+  .progress-wrap:hover .progress-thumb { transform: translate(-50%, -50%) scale(1); }
+
+  /* CONTROL ROW */
+  .ctrl-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .ctrl-left, .ctrl-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .ctrl-btn {
+    background: transparent;
+    border: none;
+    color: var(--text);
+    cursor: pointer;
+    padding: 6px;
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    transition: color 0.15s, background 0.15s;
+    opacity: 0.8;
+  }
+  .ctrl-btn:hover { color: var(--accent); opacity: 1; background: rgba(200,245,90,0.08); }
+  .ctrl-btn:active { transform: scale(0.92); }
+  .ctrl-btn svg { width: 20px; height: 20px; }
+  .ctrl-btn.large svg { width: 26px; height: 26px; }
+
+  .time-display {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted2);
+    letter-spacing: 0.05em;
+    user-select: none;
+  }
+
+  /* VOLUME */
+  .vol-wrap {
+    display: flex; align-items: center; gap: 8px;
+  }
+
+  input[type="range"].vol-slider {
+    -webkit-appearance: none;
+    width: 70px; height: 3px;
+    background: rgba(255,255,255,0.15);
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+  }
+  input[type="range"].vol-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px; height: 12px;
+    background: var(--text);
+    border-radius: 50%;
+    cursor: pointer;
+  }
+
+  /* SYNC TOAST */
+  .sync-toast {
+    position: absolute; top: 14px; left: 50%;
+    transform: translateX(-50%) translateY(-10px);
+    background: rgba(14,20,25,0.95);
+    border: 1px solid var(--border2);
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted2);
+    white-space: nowrap;
+    z-index: 10;
+    opacity: 0;
+    transition: opacity 0.3s, transform 0.3s;
+    pointer-events: none;
+  }
+  .sync-toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+  .sync-toast.good { color: var(--success); border-color: rgba(77,255,160,0.3); }
+  .sync-toast.warn { color: var(--warn); border-color: rgba(255,195,107,0.3); }
+
+  /* STATS BAR */
+  .stats-bar {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    flex-wrap: wrap;
+  }
+
+  .stat {
+    display: flex; align-items: center; gap: 8px;
+  }
+  .stat-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .stat-value {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--text);
+    min-width: 60px;
+  }
+  .stat-value.good { color: var(--success); }
+  .stat-value.warn { color: var(--warn); }
+  .stat-value.bad { color: var(--danger); }
+
+  .stat-sep {
+    width: 1px; height: 20px;
+    background: var(--border);
+    flex-shrink: 0;
+  }
+
+  /* LOG */
+  .log-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .log-header {
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 8px;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+  .log-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--accent);
+    animation: pulse-dot 2s infinite;
+  }
+  #logOutput {
+    height: 110px;
+    overflow-y: auto;
+    padding: 10px 16px;
+    font-family: var(--mono);
+    font-size: 11px;
+    line-height: 1.8;
+    color: var(--muted2);
+    scroll-behavior: smooth;
+  }
+  #logOutput::-webkit-scrollbar { width: 4px; }
+  #logOutput::-webkit-scrollbar-track { background: transparent; }
+  #logOutput::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+  .log-line { display: flex; gap: 10px; }
+  .log-time { color: var(--muted); flex-shrink: 0; }
+  .log-msg.info { color: var(--muted2); }
+  .log-msg.success { color: var(--success); }
+  .log-msg.warn { color: var(--warn); }
+  .log-msg.error { color: var(--danger); }
+  .log-msg.sync { color: var(--accent); }
+
+  /* FULLSCREEN */
+  :fullscreen .video-section { border-radius: 0; border: none; }
+  :fullscreen .video-controls { padding-bottom: 24px; }
+
+  /* DISCONNECTED OVERLAY */
+  .dc-overlay {
+    position: absolute; inset: 0;
+    background: rgba(8,11,15,0.88);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 12px;
+    z-index: 8;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.4s;
+    border-radius: 16px;
+  }
+  .dc-overlay.show { opacity: 1; pointer-events: auto; }
+  .dc-overlay span { font-family: var(--mono); font-size: 13px; color: var(--warn); }
+</style>
 </head>
 <body>
-    <h2>Sovereign Sync P2P</h2>
-    <input type="file" id="fileInput" accept="video/mp4">
-    <video id="videoPlayer" controls playsinline webkit-playsinline></video>
-    
-    <div class="controls">
-        <input id="remoteId" placeholder="Arkadaşın ID'sini gir">
-        <button onclick="connect()">Bağlan</button>
+
+<div id="ambient-glow"></div>
+
+<div class="layout">
+
+  <!-- HEADER -->
+  <header>
+    <div class="logo">
+      <div class="logo-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="5 3 19 12 5 21 5 3"/>
+          <line x1="19" y1="12" x2="23" y2="12"/>
+          <line x1="1" y1="12" x2="5" y2="12"/>
+        </svg>
+      </div>
+      SovereignSync
     </div>
-    <p>Senin ID: <b id="myId">...</b> | <span id="status">Bağlantı yok</span></p>
+    <div class="connection-bar">
+      <div class="status-dot" id="statusDot"></div>
+      <span class="status-label" id="statusLabel">başlatılıyor...</span>
+      <span class="role-badge none" id="roleBadge">—</span>
+    </div>
+  </header>
 
-    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-    <script>
-        const video = document.getElementById('videoPlayer');
-        const peer = new Peer();
-        let conn;
+  <!-- ID / CONNECT SECTION -->
+  <div class="id-section">
+    <div class="id-card">
+      <div>
+        <div class="id-card-label">Senin ID'n</div>
+        <div class="id-value" id="myIdDisplay" onclick="copyMyId()" title="Kopyalamak için tıkla">
+          <span id="myIdText">…</span>
+          <span class="copy-hint">kopyala</span>
+        </div>
+      </div>
+    </div>
+    <div class="id-card">
+      <div class="connect-form">
+        <div class="id-input-wrap">
+          <div class="id-card-label">Arkadaşının ID'si</div>
+          <input type="text" id="remoteIdInput" placeholder="xxxx-xxxx-xxxx" spellcheck="false">
+        </div>
+        <button class="btn btn-primary" id="connectBtn" onclick="connectToPeer()" disabled>Bağlan</button>
+        <button class="btn btn-ghost" id="disconnectBtn" onclick="disconnectPeer()" style="display:none">Kes</button>
+      </div>
+    </div>
+  </div>
 
-        peer.on('open', id => document.getElementById('myId').innerText = id);
+  <!-- VIDEO SECTION -->
+  <div class="video-section" id="videoSection">
+    <!-- DROP ZONE -->
+    <div class="drop-zone" id="dropZone">
+      <div class="drop-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="17 8 12 3 7 8"/>
+          <line x1="12" y1="3" x2="12" y2="15"/>
+        </svg>
+      </div>
+      <div class="drop-text">Video dosyasını sürükle veya tıkla</div>
+      <div class="drop-sub">mp4 · mkv · webm · mov</div>
+    </div>
+    <input type="file" id="fileInputHidden" accept="video/*">
 
-        document.getElementById('fileInput').onchange = e => {
-            video.src = URL.createObjectURL(e.target.files[0]);
-        };
+    <video id="videoEl" playsinline></video>
 
-        function connect() {
-            conn = peer.connect(document.getElementById('remoteId').value);
-            setupConn();
-        }
+    <!-- SYNC TOAST -->
+    <div class="sync-toast" id="syncToast">—</div>
 
-        peer.on('connection', c => { conn = c; setupConn(); });
+    <!-- DC OVERLAY -->
+    <div class="dc-overlay" id="dcOverlay">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#ffc36b" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M18.36 6.64A9 9 0 0 1 20.77 15"/>
+        <path d="M6.16 6.16a9 9 0 1 0 12.68 12.68"/>
+        <line x1="2" y1="2" x2="22" y2="22"/>
+      </svg>
+      <span>Bağlantı kesildi — yeniden bağlanıyor...</span>
+    </div>
 
-        let isRemoteUpdate = false; // "Bu komut ağdan geldi, kendi kendine tekrar etme" bayrağı
+    <!-- VIDEO CONTROLS -->
+    <div class="video-controls hidden" id="videoControls">
+      <!-- PROGRESS -->
+      <div class="progress-wrap" id="progressWrap">
+        <div class="progress-track">
+          <div class="progress-buf" id="progressBuf" style="width:0%"></div>
+          <div class="progress-fill" id="progressFill" style="width:0%"></div>
+        </div>
+        <div class="progress-thumb" id="progressThumb" style="left:0%"></div>
+      </div>
 
-        function setupConn() {
-            conn.on('open', () => document.getElementById('status').innerText = "BAĞLANDI!");
-            conn.on('data', data => {
-                isRemoteUpdate = true; // Komutun ağdan geldiğini işaretle
-                
-                if (data.type === 'PLAY') { video.play(); }
-                if (data.type === 'PAUSE') { video.pause(); }
-                if (data.type === 'SEEK') { video.currentTime = data.time; }
-                if (data.type === 'HEARTBEAT') { if (video.currentTime > data.time + 1.0) {video.currentTime = data.time; } }
+      <!-- CONTROLS -->
+      <div class="ctrl-row">
+        <div class="ctrl-left">
+          <button class="ctrl-btn large" id="playPauseBtn" onclick="togglePlay()" title="Oynat / Duraklat">
+            <svg id="playIcon" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          </button>
+          <button class="ctrl-btn" onclick="skipBy(-10)" title="-10s">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.96"/><text x="8" y="15" font-size="5" fill="currentColor" stroke="none" font-family="sans-serif">10</text></svg>
+          </button>
+          <button class="ctrl-btn" onclick="skipBy(10)" title="+10s">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-.49-3.96"/><text x="8" y="15" font-size="5" fill="currentColor" stroke="none" font-family="sans-serif">10</text></svg>
+          </button>
 
-                
-                // İşlem bittikten kısa süre sonra bayrağı sıfırla
-                setTimeout(() => isRemoteUpdate = false, 100);
-            });
-        }
+          <div class="vol-wrap">
+            <button class="ctrl-btn" onclick="toggleMute()" id="muteBtn" title="Ses">
+              <svg id="volIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+            </button>
+            <input type="range" class="vol-slider" id="volSlider" min="0" max="1" step="0.02" value="1" oninput="setVolume(this.value)">
+          </div>
 
-        // Sadece KULLANICI tıklarsa gönder (Ağdan gelen güncellemeyi gönderme!)
-        video.onplay = () => {
-            if (!isRemoteUpdate && conn && conn.open) conn.send({ type: 'PLAY', time: video.currentTime });
-        };
-        
-        video.onpause = () => {
-            if (!isRemoteUpdate && conn && conn.open) conn.send({ type: 'PAUSE', time: video.currentTime });
-        };
-        
-        video.onseeked = () => {
-            if (!isRemoteUpdate && conn && conn.open) conn.send({ type: 'SEEK', time: video.currentTime });
-        };
-        // 1 saniyede bir çok hafif kontrol
-        setInterval(() => {
-            if (conn && conn.open) {
-                conn.send({ type: 'HEARTBEAT', time: video.currentTime });
-            }
-        }, 1000);
-    </script>
+          <span class="time-display" id="timeDisplay">0:00 / 0:00</span>
+        </div>
+
+        <div class="ctrl-right">
+          <button class="ctrl-btn" onclick="toggleFullscreen()" title="Tam ekran">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STATS BAR -->
+  <div class="stats-bar">
+    <div class="stat">
+      <span class="stat-label">Gecikme</span>
+      <span class="stat-value" id="statLatency">—</span>
+    </div>
+    <div class="stat-sep"></div>
+    <div class="stat">
+      <span class="stat-label">Drift</span>
+      <span class="stat-value" id="statDrift">—</span>
+    </div>
+    <div class="stat-sep"></div>
+    <div class="stat">
+      <span class="stat-label">Düzeltme</span>
+      <span class="stat-value" id="statCorrections">0</span>
+    </div>
+    <div class="stat-sep"></div>
+    <div class="stat">
+      <span class="stat-label">Paket</span>
+      <span class="stat-value" id="statPackets">0</span>
+    </div>
+    <div class="stat-sep"></div>
+    <div class="stat">
+      <span class="stat-label">Rol</span>
+      <span class="stat-value" id="statRole">—</span>
+    </div>
+    <div class="stat-sep"></div>
+    <div class="stat">
+      <span class="stat-label">Arabellek</span>
+      <span class="stat-value" id="statBuffer">—</span>
+    </div>
+  </div>
+
+  <!-- LOG -->
+  <div class="log-wrap">
+    <div class="log-header">
+      <div class="log-dot"></div>
+      sync log
+    </div>
+    <div id="logOutput"></div>
+  </div>
+
+</div>
+
+<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+<script>
+// ─────────────────────────────────────────────
+//  STATE
+// ─────────────────────────────────────────────
+const video = document.getElementById('videoEl');
+let peer, conn;
+let isHost = false;
+let isMuted = false;
+let hasVideo = false;
+let controlsTimeout;
+
+// remoteUpdateFlag: set when we apply a command from network.
+// Must stay true long enough to suppress the browser events that fire
+// as a RESULT of our seek/play/pause call (seeked, play, pause can fire
+// up to ~300ms after the call depending on browser/codec).
+let remoteUpdateFlag = false;
+let remoteUpdateTimer = null;
+const REMOTE_FLAG_TTL = 500; // ms — generous to cover slow seeks
+
+// intentionalPause: true when the HOST paused on purpose.
+// Prevents BUFFER_STALL=false from auto-resuming a paused video.
+let intentionalPause = false;
+
+// remoteStall: true when the OTHER side sent BUFFER_STALL=true.
+// We track separately so we only resume when BOTH sides are ready.
+let remoteStall = false;
+
+// NTP-style latency measurement
+let measuredLatency = 0; // one-way estimate in ms
+let latencyHistory = [];
+const MAX_LAT_SAMPLES = 10;
+
+// Sync
+let totalCorrections = 0;
+let totalPackets = 0;
+
+// Reconnect
+let reconnectAttempts = 0;
+let reconnectTimer = null;
+let lastRemoteId = '';
+
+// Drift compensation — rolling window
+let driftHistory = [];
+const MAX_DRIFT_SAMPLES = 5;
+
+// ─────────────────────────────────────────────
+//  LOGGING
+// ─────────────────────────────────────────────
+function log(msg, type = 'info') {
+  const wrap = document.getElementById('logOutput');
+  const now = new Date();
+  const t = now.toTimeString().slice(0, 8);
+  const line = document.createElement('div');
+  line.className = 'log-line';
+  line.innerHTML = `<span class="log-time">${t}</span><span class="log-msg ${type}">${msg}</span>`;
+  wrap.appendChild(line);
+  wrap.scrollTop = wrap.scrollHeight;
+  if (wrap.children.length > 200) wrap.removeChild(wrap.children[0]);
+}
+
+// ─────────────────────────────────────────────
+//  PEER INIT
+// ─────────────────────────────────────────────
+function initPeer() {
+  setStatus('connecting', 'bağlanıyor...');
+  log('PeerJS sunucusuna bağlanılıyor...', 'info');
+
+  peer = new Peer(undefined, {
+    debug: 0,
+    config: {
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' }
+      ]
+    }
+  });
+
+  peer.on('open', id => {
+    document.getElementById('myIdText').textContent = id;
+    document.getElementById('connectBtn').disabled = false;
+    setStatus('idle', 'hazır');
+    log(`Peer ID alındı: ${id}`, 'success');
+  });
+
+  peer.on('connection', c => {
+    log(`Gelen bağlantı: ${c.peer}`, 'info');
+    isHost = true;
+    setRole('host');
+    handleConn(c);
+  });
+
+  peer.on('error', err => {
+    log(`Peer hatası: ${err.type}`, 'error');
+    if (err.type === 'peer-unavailable') {
+      showToast('Arkadaş bulunamadı', 'warn');
+    }
+    if (err.type === 'disconnected' || err.type === 'network') {
+      scheduleReconnect();
+    }
+  });
+
+  peer.on('disconnected', () => {
+    log('Sunucu bağlantısı kesildi, yeniden bağlanıyor...', 'warn');
+    peer.reconnect();
+  });
+}
+
+// ─────────────────────────────────────────────
+//  CONNECT
+// ─────────────────────────────────────────────
+function connectToPeer() {
+  const rid = document.getElementById('remoteIdInput').value.trim();
+  if (!rid || !peer) return;
+  lastRemoteId = rid;
+  isHost = false;
+  setRole('guest');
+  log(`Bağlanılıyor: ${rid}`, 'info');
+  const c = peer.connect(rid, { reliable: true, serialization: 'json' });
+  handleConn(c);
+}
+
+function disconnectPeer() {
+  if (conn) { try { conn.close(); } catch(e){} conn = null; }
+  clearTimeout(reconnectTimer);
+  setStatus('idle', 'hazır');
+  document.getElementById('disconnectBtn').style.display = 'none';
+  document.getElementById('connectBtn').style.display = '';
+  document.getElementById('dcOverlay').classList.remove('show');
+  log('Bağlantı kesildi.', 'warn');
+}
+
+function scheduleReconnect() {
+  if (!lastRemoteId || !isHost === false) return; // only guest reconnects
+  reconnectAttempts++;
+  const delay = Math.min(1000 * Math.pow(1.5, reconnectAttempts), 15000);
+  log(`Yeniden bağlanma ${(delay/1000).toFixed(1)}s sonra...`, 'warn');
+  reconnectTimer = setTimeout(() => {
+    if (lastRemoteId) connectToPeer();
+  }, delay);
+}
+
+// ─────────────────────────────────────────────
+//  CONNECTION SETUP
+// ─────────────────────────────────────────────
+function handleConn(c) {
+  conn = c;
+  document.getElementById('dcOverlay').classList.remove('show');
+
+  conn.on('open', () => {
+    setStatus('connected', 'bağlandı');
+    reconnectAttempts = 0;
+    document.getElementById('disconnectBtn').style.display = '';
+    document.getElementById('connectBtn').style.display = 'none';
+    log(`P2P bağlantısı kuruldu — rol: ${isHost ? 'HOST' : 'GUEST'}`, 'success');
+    showToast('Bağlantı kuruldu ✓', 'good');
+    startPingLoop();
+  });
+
+  conn.on('data', onData);
+
+  conn.on('close', () => {
+    setStatus('idle', 'bağlantı kesildi');
+    document.getElementById('dcOverlay').classList.add('show');
+    log('Bağlantı kapandı.', 'warn');
+    if (!isHost) scheduleReconnect();
+  });
+
+  conn.on('error', err => {
+    log(`Bağlantı hatası: ${err}`, 'error');
+  });
+}
+
+// ─────────────────────────────────────────────
+//  NTP-STYLE PING/PONG
+// ─────────────────────────────────────────────
+let pingInterval;
+let pendingPings = {};
+
+function startPingLoop() {
+  clearInterval(pingInterval);
+  pingInterval = setInterval(sendPing, 3000);
+  sendPing();
+}
+
+function sendPing() {
+  if (!conn || !conn.open) return;
+  const id = Date.now();
+  pendingPings[id] = id;
+  send({ type: 'PING', id, t: id });
+}
+
+function handlePong(data) {
+  const rtt = Date.now() - data.t;
+  const oneWay = rtt / 2;
+  latencyHistory.push(oneWay);
+  if (latencyHistory.length > MAX_LAT_SAMPLES) latencyHistory.shift();
+  const medianLat = median(latencyHistory);
+  measuredLatency = medianLat;
+  delete pendingPings[data.id];
+
+  const el = document.getElementById('statLatency');
+  el.textContent = `${Math.round(medianLat)}ms`;
+  el.className = 'stat-value ' + (medianLat < 50 ? 'good' : medianLat < 150 ? '' : 'warn');
+}
+
+// ─────────────────────────────────────────────
+//  MESSAGE HANDLER
+// ─────────────────────────────────────────────
+function onData(data) {
+  totalPackets++;
+  document.getElementById('statPackets').textContent = totalPackets;
+
+  if (data.type === 'PING') {
+    send({ type: 'PONG', id: data.id, t: data.t });
+    return;
+  }
+  if (data.type === 'PONG') {
+    handlePong(data);
+    return;
+  }
+
+  // ── AUTHORITY MODEL ──────────────────────────────────────────────────
+  // Only the HOST sends PLAY / PAUSE / SEEK commands.
+  // The GUEST sends nothing back except PING/PONG and BUFFER_STALL.
+  // So: if WE are host, we only care about BUFFER_STALL from guest.
+  //     If WE are guest, we obey all commands from host.
+  // ─────────────────────────────────────────────────────────────────────
+
+  switch(data.type) {
+    case 'PLAY':
+      if (!isHost) applyPlay(data);
+      break;
+
+    case 'PAUSE':
+      if (!isHost) applyPause(data);
+      break;
+
+    case 'SEEK':
+      if (!isHost) applySeek(data);
+      break;
+
+    case 'HEARTBEAT':
+      if (!isHost) handleHeartbeat(data);
+      break;
+
+    case 'BUFFER_STALL':
+      handleBufferStall(data);
+      break;
+  }
+}
+
+function applyPlay(data) {
+  setRemoteFlag();
+  if (data.currentTime !== undefined) {
+    const compensation = measuredLatency / 1000;
+    const target = data.currentTime + compensation;
+    if (Math.abs(video.currentTime - target) > 0.3) {
+      video.currentTime = target;
+    }
+  }
+  intentionalPause = false;
+  video.play().catch(() => {});
+  log(`▶ PLAY alındı (t=${(data.currentTime||0).toFixed(2)}s, comp=${Math.round(measuredLatency)}ms)`, 'sync');
+}
+
+function applyPause(data) {
+  setRemoteFlag();
+  if (data.currentTime !== undefined) {
+    video.currentTime = data.currentTime;
+  }
+  intentionalPause = true;
+  video.pause();
+  log(`⏸ PAUSE alındı (t=${(data.currentTime||0).toFixed(2)}s)`, 'sync');
+}
+
+function applySeek(data) {
+  setRemoteFlag();
+  video.currentTime = data.currentTime;
+  log(`⏩ SEEK alındı → ${formatTime(data.currentTime)}`, 'sync');
+}
+
+function handleBufferStall(data) {
+  if (data.stalled) {
+    // Remote side is buffering — pause us too (only if currently playing)
+    remoteStall = true;
+    if (!video.paused) {
+      setRemoteFlag();
+      video.pause();
+      log('⏳ Karşı taraf tampon dolduruyor, bekleniyor...', 'warn');
+      showToast('Tampon bekleniyor...', 'warn');
+    }
+  } else {
+    // Remote side is ready
+    remoteStall = false;
+    // Only resume if: we're not intentionally paused AND our own buffer is also ready
+    if (!intentionalPause && video.paused && video.readyState >= 3) {
+      setRemoteFlag();
+      video.play().catch(() => {});
+      log('▶ Karşı taraf hazır, devam ediliyor', 'sync');
+    }
+  }
+}
+
+// ─────────────────────────────────────────────
+//  HEARTBEAT SYNC (drift correction) — guest only
+// ─────────────────────────────────────────────
+function handleHeartbeat(data) {
+  if (data.currentTime === undefined) return;
+
+  const expectedTime = data.currentTime + (measuredLatency / 1000);
+  const drift = video.currentTime - expectedTime;
+
+  driftHistory.push(drift);
+  if (driftHistory.length > MAX_DRIFT_SAMPLES) driftHistory.shift();
+  const avgDrift = driftHistory.reduce((a, b) => a + b, 0) / driftHistory.length;
+
+  const absDrift = Math.abs(avgDrift);
+  const driftEl = document.getElementById('statDrift');
+  driftEl.textContent = `${avgDrift >= 0 ? '+' : ''}${(avgDrift * 1000).toFixed(0)}ms`;
+  driftEl.className = 'stat-value ' + (absDrift < 0.5 ? 'good' : absDrift < 1.5 ? '' : 'warn');
+
+  // Hard correction if > 1.5s (only while playing — don't seek a paused video constantly)
+  if (absDrift > 1.5 && !video.paused) {
+    setRemoteFlag();
+    video.currentTime = expectedTime;
+    totalCorrections++;
+    document.getElementById('statCorrections').textContent = totalCorrections;
+    log(`⚡ Sert düzeltme: ${(avgDrift * 1000).toFixed(0)}ms drift → sıfırlandı`, 'warn');
+    showToast(`Drift düzeltildi (${(avgDrift*1000).toFixed(0)}ms)`, 'warn');
+  }
+  // Soft correction: nudge playback rate while playing
+  else if (absDrift > 0.15 && !video.paused) {
+    const nudge = Math.max(-0.12, Math.min(0.12, -avgDrift * 0.4));
+    video.playbackRate = Math.max(0.88, Math.min(1.12, 1.0 + nudge));
+  } else if (!video.paused) {
+    video.playbackRate = 1.0;
+  }
+
+  // Sync play/pause state from host heartbeat
+  if (data.playing !== undefined) {
+    if (data.playing && video.paused && !video.ended && !remoteStall) {
+      // Host is playing but we're paused → follow
+      intentionalPause = false;
+      setRemoteFlag();
+      video.play().catch(() => {});
+    } else if (!data.playing && !video.paused) {
+      // Host paused → we pause too
+      intentionalPause = true;
+      setRemoteFlag();
+      video.pause();
+    }
+  }
+}
+
+// ─────────────────────────────────────────────
+//  HEARTBEAT SENDER (host → guest, ~every 1s)
+// ─────────────────────────────────────────────
+setInterval(() => {
+  if (conn && conn.open && isHost) {
+    send({
+      type: 'HEARTBEAT',
+      currentTime: video.currentTime,
+      playing: !video.paused
+    });
+  }
+}, 1000);
+
+// ─────────────────────────────────────────────
+//  VIDEO EVENT LISTENERS
+// ─────────────────────────────────────────────
+
+// Only HOST broadcasts play/pause/seek.
+// GUEST only reports buffer stalls.
+
+video.addEventListener('play', () => {
+  updatePlayIcon(true);
+  if (remoteUpdateFlag) return; // This play was triggered by a network command — don't echo
+  if (!isHost) return;          // Guest never sends play commands
+  if (!conn || !conn.open) return;
+  intentionalPause = false;
+  send({ type: 'PLAY', currentTime: video.currentTime });
+  log(`▶ PLAY gönderildi (t=${video.currentTime.toFixed(2)}s)`, 'sync');
+});
+
+video.addEventListener('pause', () => {
+  updatePlayIcon(false);
+  if (remoteUpdateFlag) return; // Triggered by network — don't echo
+  if (!isHost) return;          // Guest never sends pause commands
+  if (!conn || !conn.open) return;
+  intentionalPause = true;
+  send({ type: 'PAUSE', currentTime: video.currentTime });
+  log(`⏸ PAUSE gönderildi (t=${video.currentTime.toFixed(2)}s)`, 'sync');
+});
+
+// Deduplicate rapid seeks: only send when stable for 80ms
+let seekSendTimer = null;
+video.addEventListener('seeked', () => {
+  if (remoteUpdateFlag) return;
+  if (!isHost) return;
+  if (!conn || !conn.open) return;
+  clearTimeout(seekSendTimer);
+  seekSendTimer = setTimeout(() => {
+    send({ type: 'SEEK', currentTime: video.currentTime });
+    log(`⏩ SEEK gönderildi → ${formatTime(video.currentTime)}`, 'sync');
+  }, 80);
+});
+
+video.addEventListener('timeupdate', updateProgress);
+video.addEventListener('progress', updateBuffer);
+video.addEventListener('durationchange', updateProgress);
+
+// Track our own local stall state
+let localStall = false;
+
+video.addEventListener('waiting', () => {
+  localStall = true;
+  document.getElementById('statBuffer').textContent = 'bekliyor';
+  document.getElementById('statBuffer').className = 'stat-value warn';
+  if (conn && conn.open) {
+    send({ type: 'BUFFER_STALL', stalled: true });
+    log('⏳ Tampon dolduruluyor...', 'warn');
+  }
+});
+
+video.addEventListener('canplay', () => {
+  const wasStalled = localStall;
+  localStall = false;
+  document.getElementById('statBuffer').textContent = 'hazır';
+  document.getElementById('statBuffer').className = 'stat-value good';
+
+  if (conn && conn.open && wasStalled) {
+    // Only notify if we actually had a stall, not on every load
+    send({ type: 'BUFFER_STALL', stalled: false });
+    log('▶ Tampon hazır', 'sync');
+
+    // HOST: if we stalled and recovered, resume (unless intentionally paused)
+    if (isHost && !intentionalPause && !remoteStall && video.paused) {
+      setRemoteFlag();
+      video.play().catch(() => {});
+    }
+  }
+});
+
+// ─────────────────────────────────────────────
+//  REMOTE FLAG HELPER
+// ─────────────────────────────────────────────
+function setRemoteFlag() {
+  remoteUpdateFlag = true;
+  clearTimeout(remoteUpdateTimer);
+  remoteUpdateTimer = setTimeout(() => { remoteUpdateFlag = false; }, REMOTE_FLAG_TTL);
+}
+
+// ─────────────────────────────────────────────
+//  SEND HELPER
+// ─────────────────────────────────────────────
+function send(data) {
+  if (conn && conn.open) {
+    try { conn.send(data); } catch(e) { log(`Gönderim hatası: ${e}`, 'error'); }
+  }
+}
+
+// ─────────────────────────────────────────────
+//  VIDEO CONTROLS UI
+// ─────────────────────────────────────────────
+function togglePlay() {
+  if (!hasVideo) return;
+  if (!isHost && conn && conn.open) {
+    showToast('Sadece HOST oynatabilir/durdurabilir', 'warn');
+    return;
+  }
+  video.paused ? video.play() : video.pause();
+}
+
+function skipBy(secs) {
+  if (!hasVideo) return;
+  if (!isHost && conn && conn.open) {
+    showToast('Sadece HOST seek yapabilir', 'warn');
+    return;
+  }
+  video.currentTime = Math.max(0, Math.min(video.duration || 0, video.currentTime + secs));
+}
+
+function toggleMute() {
+  isMuted = !isMuted;
+  video.muted = isMuted;
+  document.getElementById('volSlider').value = isMuted ? 0 : video.volume;
+  updateVolIcon();
+}
+
+function setVolume(v) {
+  video.volume = parseFloat(v);
+  isMuted = (v == 0);
+  video.muted = isMuted;
+  updateVolIcon();
+}
+
+function updateVolIcon() {
+  const icon = document.getElementById('volIcon');
+  if (isMuted || video.volume === 0) {
+    icon.innerHTML = `<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/>`;
+  } else {
+    icon.innerHTML = `<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>`;
+  }
+}
+
+function updatePlayIcon(playing) {
+  const icon = document.getElementById('playIcon');
+  if (playing) {
+    icon.innerHTML = `<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>`;
+  } else {
+    icon.innerHTML = `<polygon points="5 3 19 12 5 21 5 3"/>`;
+  }
+}
+
+function toggleFullscreen() {
+  const el = document.getElementById('videoSection');
+  if (!document.fullscreenElement) {
+    el.requestFullscreen().catch(()=>{});
+  } else {
+    document.exitFullscreen();
+  }
+}
+
+// Progress bar
+function updateProgress() {
+  const pct = video.duration ? (video.currentTime / video.duration) * 100 : 0;
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressThumb').style.left = pct + '%';
+  document.getElementById('timeDisplay').textContent = `${formatTime(video.currentTime)} / ${formatTime(video.duration || 0)}`;
+}
+
+function updateBuffer() {
+  if (!video.duration) return;
+  let bufPct = 0;
+  for (let i = 0; i < video.buffered.length; i++) {
+    if (video.buffered.start(i) <= video.currentTime) {
+      bufPct = (video.buffered.end(i) / video.duration) * 100;
+    }
+  }
+  document.getElementById('progressBuf').style.width = bufPct + '%';
+}
+
+// Click on progress bar to seek
+document.getElementById('progressWrap').addEventListener('click', e => {
+  if (!isHost && conn && conn.open) { showToast('Sadece HOST seek yapabilir', 'warn'); return; }
+  const rect = e.currentTarget.getBoundingClientRect();
+  const pct = (e.clientX - rect.left) / rect.width;
+  if (video.duration) video.currentTime = pct * video.duration;
+});
+
+// Mouse drag on progress
+let dragging = false;
+document.getElementById('progressWrap').addEventListener('mousedown', e => {
+  if (!isHost && conn && conn.open) return;
+  dragging = true;
+  seekToMouse(e);
+});
+document.addEventListener('mousemove', e => { if (dragging) seekToMouse(e); });
+document.addEventListener('mouseup', () => { dragging = false; });
+
+function seekToMouse(e) {
+  const rect = document.getElementById('progressWrap').getBoundingClientRect();
+  const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+  if (video.duration) video.currentTime = pct * video.duration;
+}
+
+// Controls auto-hide
+const videoSection = document.getElementById('videoSection');
+const videoControls = document.getElementById('videoControls');
+
+videoSection.addEventListener('mousemove', showControls);
+videoSection.addEventListener('click', () => {
+  if (!document.fullscreenElement) return;
+  togglePlay();
+});
+
+function showControls() {
+  videoControls.classList.remove('hidden');
+  video.style.cursor = 'default';
+  clearTimeout(controlsTimeout);
+  if (!video.paused && hasVideo) {
+    controlsTimeout = setTimeout(() => {
+      videoControls.classList.add('hidden');
+      video.style.cursor = 'none';
+    }, 2800);
+  }
+}
+
+video.addEventListener('play', () => {
+  controlsTimeout = setTimeout(() => {
+    videoControls.classList.add('hidden');
+    video.style.cursor = 'none';
+  }, 2800);
+});
+video.addEventListener('pause', showControls);
+
+// Keyboard shortcuts
+document.addEventListener('keydown', e => {
+  if (['INPUT', 'TEXTAREA'].includes(e.target.tagName)) return;
+  const guestLocked = !isHost && conn && conn.open;
+  switch(e.key) {
+    case ' ':
+    case 'k':
+      e.preventDefault();
+      togglePlay();
+      break;
+    case 'ArrowLeft':
+      if (guestLocked) { showToast('Sadece HOST seek yapabilir', 'warn'); break; }
+      skipBy(-10);
+      break;
+    case 'ArrowRight':
+      if (guestLocked) { showToast('Sadece HOST seek yapabilir', 'warn'); break; }
+      skipBy(10);
+      break;
+    case 'f':
+      toggleFullscreen();
+      break;
+    case 'm':
+      toggleMute();
+      break;
+    case 'ArrowUp':
+      e.preventDefault();
+      setVolume(Math.min(1, video.volume + 0.1));
+      document.getElementById('volSlider').value = video.volume;
+      break;
+    case 'ArrowDown':
+      e.preventDefault();
+      setVolume(Math.max(0, video.volume - 0.1));
+      document.getElementById('volSlider').value = video.volume;
+      break;
+  }
+});
+
+// ─────────────────────────────────────────────
+//  FILE LOADING
+// ─────────────────────────────────────────────
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInputHidden');
+
+dropZone.addEventListener('click', () => fileInput.click());
+
+dropZone.addEventListener('dragover', e => {
+  e.preventDefault();
+  dropZone.classList.add('drag-over');
+});
+
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('drag-over');
+  const f = e.dataTransfer.files[0];
+  if (f && f.type.startsWith('video/')) loadVideo(f);
+});
+
+fileInput.addEventListener('change', e => {
+  if (e.target.files[0]) loadVideo(e.target.files[0]);
+});
+
+function loadVideo(file) {
+  const url = URL.createObjectURL(file);
+  video.src = url;
+  video.load();
+  hasVideo = true;
+  dropZone.classList.add('hidden');
+  videoControls.classList.remove('hidden');
+  log(`Video yüklendi: ${file.name}`, 'success');
+  document.getElementById('statBuffer').textContent = 'yükleniyor';
+  updateAmbientGlow();
+}
+
+// ─────────────────────────────────────────────
+//  AMBIENT GLOW (color from video frame)
+// ─────────────────────────────────────────────
+let ambientCanvas = document.createElement('canvas');
+let ambientCtx = ambientCanvas.getContext('2d');
+ambientCanvas.width = 16; ambientCanvas.height = 9;
+
+function updateAmbientGlow() {
+  if (!hasVideo || video.readyState < 2) return;
+  try {
+    ambientCtx.drawImage(video, 0, 0, 16, 9);
+    const d = ambientCtx.getImageData(0, 0, 16, 9).data;
+    let r = 0, g = 0, b = 0;
+    for (let i = 0; i < d.length; i += 4) { r += d[i]; g += d[i+1]; b += d[i+2]; }
+    const px = (16*9);
+    r = Math.round(r/px); g = Math.round(g/px); b = Math.round(b/px);
+    document.getElementById('ambient-glow').style.background =
+      `radial-gradient(ellipse at center, rgba(${r},${g},${b},0.12) 0%, transparent 70%)`;
+  } catch(e) {}
+}
+
+setInterval(() => { if (!video.paused) updateAmbientGlow(); }, 2000);
+
+// ─────────────────────────────────────────────
+//  TOAST
+// ─────────────────────────────────────────────
+let toastTimer;
+function showToast(msg, type = 'info') {
+  const t = document.getElementById('syncToast');
+  t.textContent = msg;
+  t.className = `sync-toast show ${type}`;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { t.className = 'sync-toast'; }, 3000);
+}
+
+// ─────────────────────────────────────────────
+//  COPY ID
+// ─────────────────────────────────────────────
+function copyMyId() {
+  const id = document.getElementById('myIdText').textContent;
+  if (id === '…') return;
+  navigator.clipboard.writeText(id).then(() => {
+    const el = document.getElementById('myIdDisplay');
+    el.classList.add('copy-flash');
+    setTimeout(() => el.classList.remove('copy-flash'), 400);
+    showToast('ID kopyalandı!', 'good');
+    log('ID panoya kopyalandı', 'info');
+  });
+}
+
+// ─────────────────────────────────────────────
+//  STATUS / ROLE HELPERS
+// ─────────────────────────────────────────────
+function setStatus(state, label) {
+  const dot = document.getElementById('statusDot');
+  const lbl = document.getElementById('statusLabel');
+  dot.className = `status-dot ${state}`;
+  lbl.textContent = label;
+}
+
+function setRole(role) {
+  const badge = document.getElementById('roleBadge');
+  const statRole = document.getElementById('statRole');
+  if (role === 'host') {
+    badge.className = 'role-badge host';
+    badge.textContent = '⬤ HOST';
+    badge.style.display = '';
+    statRole.textContent = 'HOST';
+    statRole.className = 'stat-value good';
+    // HOST: full controls
+    document.getElementById('playPauseBtn').style.opacity = '1';
+    document.getElementById('playPauseBtn').title = 'Oynat / Duraklat';
+    document.getElementById('progressWrap').style.cursor = 'pointer';
+    document.getElementById('progressWrap').title = '';
+  } else {
+    badge.className = 'role-badge guest';
+    badge.textContent = '◯ GUEST';
+    badge.style.display = '';
+    statRole.textContent = 'GUEST';
+    statRole.className = 'stat-value';
+    // GUEST: play/seek locked visually
+    document.getElementById('playPauseBtn').style.opacity = '0.35';
+    document.getElementById('playPauseBtn').title = 'HOST kontrol ediyor';
+    document.getElementById('progressWrap').style.cursor = 'not-allowed';
+    document.getElementById('progressWrap').title = 'HOST kontrol ediyor';
+  }
+}
+
+// ─────────────────────────────────────────────
+//  UTILS
+// ─────────────────────────────────────────────
+function formatTime(s) {
+  if (!isFinite(s)) return '0:00';
+  const m = Math.floor(s / 60);
+  const sec = Math.floor(s % 60).toString().padStart(2, '0');
+  const h = Math.floor(m / 60);
+  if (h > 0) return `${h}:${String(Math.floor(m % 60)).padStart(2,'0')}:${sec}`;
+  return `${m}:${sec}`;
+}
+
+function median(arr) {
+  if (!arr.length) return 0;
+  const s = [...arr].sort((a, b) => a - b);
+  const mid = Math.floor(s.length / 2);
+  return s.length % 2 ? s[mid] : (s[mid-1] + s[mid]) / 2;
+}
+
+// ─────────────────────────────────────────────
+//  BOOT
+// ─────────────────────────────────────────────
+initPeer();
+log('SovereignSync başlatıldı. ID alınıyor...', 'info');
+log('Nasıl kullanılır: İki taraf da aynı video dosyasını yükler. Biri bağlantı kurar, senkronize izler.', 'info');
+</script>
 </body>
 </html>
