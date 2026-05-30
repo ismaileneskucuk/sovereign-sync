@@ -41,25 +41,34 @@
 
         peer.on('connection', c => { conn = c; setupConn(); });
 
+        let isRemoteUpdate = false; // "Bu komut ağdan geldi, kendi kendine tekrar etme" bayrağı
+
         function setupConn() {
             conn.on('open', () => document.getElementById('status').innerText = "BAĞLANDI!");
-            
-            // Sadece bir komut geldiğinde tepki ver
             conn.on('data', data => {
+                isRemoteUpdate = true; // Komutun ağdan geldiğini işaretle
+                
                 if (data.type === 'PLAY') { video.currentTime = data.time; video.play(); }
                 if (data.type === 'PAUSE') { video.pause(); video.currentTime = data.time; }
                 if (data.type === 'SEEK') { video.currentTime = data.time; }
-                if (data.type === 'HEARTBEAT') {
-                    if (Math.abs(video.currentTime - data.time) > 1.0) video.currentTime = data.time;
-                }
+                
+                // İşlem bittikten kısa süre sonra bayrağı sıfırla
+                setTimeout(() => isRemoteUpdate = false, 500);
             });
         }
 
-        // Olay tabanlı gönderim (Daha az yük, daha az takılma)
-        video.onplay = () => conn && conn.send({ type: 'PLAY', time: video.currentTime });
-        video.onpause = () => conn && conn.send({ type: 'PAUSE', time: video.currentTime });
-        video.onseeked = () => conn && conn.send({ type: 'SEEK', time: video.currentTime });
-
+        // Sadece KULLANICI tıklarsa gönder (Ağdan gelen güncellemeyi gönderme!)
+        video.onplay = () => {
+            if (!isRemoteUpdate && conn && conn.open) conn.send({ type: 'PLAY', time: video.currentTime });
+        };
+        
+        video.onpause = () => {
+            if (!isRemoteUpdate && conn && conn.open) conn.send({ type: 'PAUSE', time: video.currentTime });
+        };
+        
+        video.onseeked = () => {
+            if (!isRemoteUpdate && conn && conn.open) conn.send({ type: 'SEEK', time: video.currentTime });
+        };
         // 3 saniyede bir çok hafif kontrol
         setInterval(() => {
             if (conn && conn.open) {
