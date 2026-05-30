@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sovereign Sync</title>
+    <style>
+        body { background: #0b141a; color: white; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; padding: 20px; }
+        #videoPlayer { width: 100%; max-width: 800px; border-radius: 10px; background: black; }
+        .controls { margin-top: 15px; display: flex; gap: 10px; }
+        #status { color: #00a884; font-weight: bold; margin: 10px; }
+    </style>
+</head>
+<body>
+    <h2>Sovereign Sync P2P</h2>
+    <input type="file" id="fileInput" accept="video/mp4">
+    <video id="videoPlayer" controls></video>
+    
+    <div class="controls">
+        <input id="remoteId" placeholder="Arkadaşın ID'sini gir">
+        <button onclick="connect()">Bağlan</button>
+    </div>
+    <p>Senin ID: <b id="myId">...</b> | <span id="status">Bağlantı yok</span></p>
+
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <script>
+        const video = document.getElementById('videoPlayer');
+        const peer = new Peer();
+        let conn;
+
+        peer.on('open', id => document.getElementById('myId').innerText = id);
+
+        // Dosya yükleme
+        document.getElementById('fileInput').onchange = e => {
+            video.src = URL.createObjectURL(e.target.files[0]);
+        };
+
+        // Bağlantı yönetimi
+        function connect() {
+            conn = peer.connect(document.getElementById('remoteId').value);
+            setupConn();
+        }
+
+        peer.on('connection', c => { conn = c; setupConn(); });
+
+        function setupConn() {
+            conn.on('open', () => document.getElementById('status').innerText = "BAĞLANDI!");
+            conn.on('data', data => {
+                if (data.type === 'SYNC') {
+                    video.currentTime = data.time;
+                    if(data.playing) video.play(); else video.pause();
+                }
+            });
+        }
+
+        // Senkronizasyon (Heartbeat)
+        setInterval(() => {
+            if (conn && conn.open) {
+                conn.send({ type: 'SYNC', time: video.currentTime, playing: !video.paused });
+            }
+        }, 500); // Yarım saniyede bir durumu karşıya bas
+    </script>
+</body>
+</html>
